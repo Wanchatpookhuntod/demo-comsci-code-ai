@@ -1,0 +1,424 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ระบบเช็คอินเข้าเรียนดิจิทัล (Digital Student Check-In)</title>
+  <!-- Google Fonts: Inter & Outfit -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- FontAwesome for icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  {% if student %}
+  <!-- Leaflet Map CSS (Only load when student is logged in) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.1/dist/leaflet.css" />
+  {% endif %}
+  
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+  <style>
+    .btn-danger-outline {
+      background: transparent;
+      border: 1px solid rgba(239, 68, 68, 0.4);
+      color: var(--danger);
+    }
+    
+    .btn-danger-outline:hover {
+      background: var(--danger-bg);
+      color: white;
+      border-color: var(--danger);
+    }
+    
+    .btn-sm {
+      padding: 8px 14px;
+      font-size: 0.85rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="glass-bg"></div>
+  
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="logo">
+        <i class="fa-solid fa-location-dot pulse"></i>
+        <span>CHECK-IN</span>
+      </div>
+      <div class="subtitle">ระบบบันทึกเวลาเรียนตามตำแหน่งพิกัดดาวเทียม</div>
+    </header>
+
+    {% if not student %}
+    <!-- ==================== LOGIN VIEW ==================== -->
+    <main style="max-width: 480px; margin: 20px auto; width: 100%;">
+      <section class="card">
+        <h2 class="card-title" style="justify-content: center; margin-bottom: 20px;">
+          <i class="fa-solid fa-right-to-bracket"></i> ลงชื่อเข้าใช้งานนักศึกษา
+        </h2>
+        
+        <div class="input-group">
+          <label for="studentId">รหัสนักศึกษา</label>
+          <div class="input-wrapper">
+            <i class="fa-solid fa-id-card input-icon"></i>
+            <input type="text" id="studentId" placeholder="กรอกรหัสนักศึกษาของคุณ (เช่น u001)" required>
+          </div>
+        </div>
+
+        <div class="input-group">
+          <label for="studentPassword">รหัสผ่าน</label>
+          <div class="input-wrapper">
+            <i class="fa-solid fa-key input-icon"></i>
+            <input type="password" id="studentPassword" placeholder="กรอกรหัสผ่านของคุณ (ค่าเริ่มต้น: 123456)" required>
+          </div>
+          <div id="loginFeedback" class="helper-text"></div>
+        </div>
+        
+        <button id="loginBtn" class="btn btn-primary" style="margin-top: 10px;">
+          <i class="fa-solid fa-right-to-bracket"></i> เข้าสู่ระบบ
+        </button>
+      </section>
+      
+      <div class="text-center" style="margin-top: 25px;">
+        <a href="/admin" style="color: var(--text-secondary); text-decoration: none; font-size: 0.9rem;">
+          <i class="fa-solid fa-user-shield"></i> สำหรับผู้ดูแลระบบ (Admin Dashboard)
+        </a>
+      </div>
+    </main>
+
+    {% else %}
+    <!-- ==================== DASHBOARD & CHECKIN VIEW ==================== -->
+    <!-- Welcome Header / User Profile card -->
+    <div class="card" style="padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; background: rgba(99, 102, 241, 0.08); border-color: rgba(99, 102, 241, 0.2);">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <div style="width: 40px; height: 40px; background: var(--primary-color); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white;">
+          <i class="fa-solid fa-user-graduate"></i>
+        </div>
+        <div>
+          <div style="font-size: 0.8rem; color: var(--text-secondary);">ลงชื่อใช้งานในชื่อ</div>
+          <div style="font-weight: 600;">{{ student.name }} (รหัสนักศึกษา: {{ student.id }})</div>
+        </div>
+      </div>
+      <div style="display: flex; gap: 10px; align-items: center;">
+        <a href="/admin" class="btn btn-sm" style="background: rgba(255, 255, 255, 0.05); color: var(--text-secondary); border: 1px solid var(--border-color); text-decoration: none;">
+          <i class="fa-solid fa-gauge"></i> แผงควบคุม Admin
+        </a>
+        <a href="/logout" class="btn btn-danger-outline btn-sm" style="text-decoration: none;">
+          <i class="fa-solid fa-right-from-bracket"></i> ออกจากระบบ
+        </a>
+      </div>
+    </div>
+
+    <!-- Main Content Grid -->
+    <main class="app-grid">
+      <!-- Left Side: Control Card & Location Status -->
+      <section class="card control-card">
+        <h2 class="card-title"><i class="fa-solid fa-location-crosshairs"></i> ลงชื่อเช็คอินเข้าเรียน</h2>
+        
+        <div class="location-badge-container">
+          <div id="distanceBadge" class="location-badge info">
+            <i class="fa-solid fa-crosshairs"></i>
+            <span id="distanceText">กำลังตรวจหาตำแหน่งพิกัดของคุณ...</span>
+          </div>
+        </div>
+
+        <button id="checkinBtn" class="btn btn-primary" disabled>
+          <i class="fa-solid fa-signature"></i> ลงชื่อเช็คอินเข้าเรียน
+        </button>
+
+        <div id="statusMessage" class="status-message"></div>
+      </section>
+
+      <!-- Right Side: Interactive Map -->
+      <section class="card map-card">
+        <h2 class="card-title"><i class="fa-solid fa-map-location-dot"></i> แผนที่พิกัดปัจจุบัน</h2>
+        <div id="map"></div>
+        <div class="map-legend">
+          <span class="legend-item"><span class="color-dot school"></span> มรภ.เทพสตรี</span>
+          <span class="legend-item"><span class="color-dot user"></span> ตำแหน่งของคุณ</span>
+          <span class="legend-item"><span class="color-dot zone"></span> รัศมี 1 กม.</span>
+        </div>
+      </section>
+    </main>
+
+    <!-- History Table Card -->
+    <section class="card history-card">
+      <div class="history-header">
+        <h2 class="card-title"><i class="fa-solid fa-clock-rotate-left"></i> ประวัติการเข้าเรียนของคุณ (10 ครั้งล่าสุด)</h2>
+        <button id="refreshHistoryBtn" class="btn btn-icon" title="รีเฟรชประวัติ">
+          <i class="fa-solid fa-rotate"></i>
+        </button>
+      </div>
+      
+      <div class="table-container">
+        <table class="history-table">
+          <thead>
+            <tr>
+              <th>วัน-เวลา</th>
+              <th>ระยะห่าง</th>
+              <th>ตำแหน่งพิกัด (Lat, Lng)</th>
+              <th>สถานะ</th>
+            </tr>
+          </thead>
+          <tbody id="historyBody">
+            <tr>
+              <td colspan="4" class="text-center text-muted">กำลังโหลดประวัติ...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+    {% endif %}
+  </div>
+
+  <!-- Javascript Logic -->
+  {% if not student %}
+  <!-- Login JS -->
+  <script>
+    const studentIdInput = document.getElementById('studentId');
+    const studentPasswordInput = document.getElementById('studentPassword');
+    const loginBtn = document.getElementById('loginBtn');
+    const loginFeedback = document.getElementById('loginFeedback');
+
+    async function performLogin() {
+      const studentId = studentIdInput.value.trim();
+      const password = studentPasswordInput.value.trim();
+      
+      if (!studentId) {
+        loginFeedback.className = 'helper-text error';
+        loginFeedback.innerHTML = '<i class="fa-solid fa-circle-xmark"></i> กรุณากรอกรหัสนักศึกษา';
+        return;
+      }
+      if (!password) {
+        loginFeedback.className = 'helper-text error';
+        loginFeedback.innerHTML = '<i class="fa-solid fa-circle-xmark"></i> กรุณากรอกรหัสผ่าน';
+        return;
+      }
+
+      loginBtn.disabled = true;
+      loginFeedback.className = 'helper-text loading';
+      loginFeedback.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> กำลังตรวจสอบรหัสผ่าน...';
+
+      try {
+        const response = await fetch('/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ student_id: studentId, password: password })
+        });
+        const data = await response.json();
+
+        if (data.success) {
+          loginFeedback.className = 'helper-text success';
+          loginFeedback.innerHTML = '<i class="fa-solid fa-circle-check"></i> เข้าสู่ระบบสำเร็จ กำลังเปลี่ยนหน้า...';
+          window.location.reload();
+        } else {
+          loginFeedback.className = 'helper-text error';
+          loginFeedback.innerHTML = '<i class="fa-solid fa-circle-xmark"></i> ' + data.message;
+          loginBtn.disabled = false;
+        }
+      } catch (err) {
+        loginFeedback.className = 'helper-text error';
+        loginFeedback.innerHTML = '<i class="fa-solid fa-circle-xmark"></i> เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์';
+        loginBtn.disabled = false;
+      }
+    }
+
+    loginBtn.addEventListener('click', performLogin);
+    studentIdInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        performLogin();
+      }
+    });
+    studentPasswordInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        performLogin();
+      }
+    });
+  </script>
+  
+  {% else %}
+  <!-- Dashboard JS -->
+  <script src="https://unpkg.com/leaflet@1.9.1/dist/leaflet.js"></script>
+  <script>
+    const school = { lat: {{ SCHOOL_COORDS.lat }}, lng: {{ SCHOOL_COORDS.lng }} };
+    const maxRadius = {{ MAX_RADIUS_METERS }};
+    
+    // ตั้งค่าแผนที่ Leaflet
+    const map = L.map('map').setView([school.lat, school.lng], 15);
+    
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+      maxZoom: 19,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+    }).addTo(map);
+
+    // รัศมี 1 กม.
+    const boundaryCircle = L.circle([school.lat, school.lng], {
+      color: '#3b82f6',
+      fillColor: '#3b82f6',
+      fillOpacity: 0.08,
+      radius: maxRadius,
+      weight: 2,
+      dashArray: '5, 5'
+    }).addTo(map);
+
+    // โรงเรียน
+    const schoolMarker = L.circleMarker([school.lat, school.lng], {
+      radius: 9,
+      color: '#1e3a8a',
+      fillColor: '#3b82f6',
+      fillOpacity: 0.9,
+      weight: 2
+    }).addTo(map).bindPopup('<b>มรภ.เทพสตรี</b>');
+
+    // ผู้ใช้
+    const userMarker = L.circleMarker([school.lat, school.lng], {
+      radius: 8,
+      color: '#b91c1c',
+      fillColor: '#ef4444',
+      fillOpacity: 0.9,
+      weight: 2
+    }).addTo(map).bindPopup('<b>ตำแหน่งของคุณ</b>');
+
+    let userCoords = null;
+
+    const checkinBtn = document.getElementById('checkinBtn');
+    const statusMessage = document.getElementById('statusMessage');
+    const distanceBadge = document.getElementById('distanceBadge');
+    const distanceText = document.getElementById('distanceText');
+    const historyBody = document.getElementById('historyBody');
+    const refreshHistoryBtn = document.getElementById('refreshHistoryBtn');
+
+    // คำนวณระยะทาง
+    function haversineMeters(lat1, lon1, lat2, lon2) {
+      const R = 6371000;
+      const toRad = (value) => value * Math.PI / 180;
+      const phi1 = toRad(lat1);
+      const phi2 = toRad(lat2);
+      const dPhi = toRad(lat2 - lat1);
+      const dLambda = toRad(lon2 - lon1);
+      const a = Math.sin(dPhi / 2) ** 2 + Math.cos(phi1) * Math.cos(phi2) * Math.sin(dLambda / 2) ** 2;
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return R * c;
+    }
+
+    // Geolocation API Tracker
+    function trackLocation() {
+      if (!navigator.geolocation) {
+        updateDistanceBadge('error', 'เบราว์เซอร์นี้ไม่สนับสนุนฟังก์ชัน Geolocation');
+        return;
+      }
+
+      navigator.geolocation.watchPosition((pos) => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        userCoords = { lat, lng };
+
+        userMarker.setLatLng([lat, lng]);
+        
+        // ขยายขอบเขต
+        const bounds = L.latLngBounds([school.lat, school.lng], [lat, lng]);
+        map.fitBounds(bounds, { padding: [50, 50] });
+
+        const dist = Math.round(haversineMeters(lat, lng, school.lat, school.lng));
+        
+        if (dist <= maxRadius) {
+          updateDistanceBadge('success', `ระยะห่าง ${dist} ม. (อยู่ในรัศมีเช็คอิน)`);
+          checkinBtn.disabled = false;
+        } else {
+          updateDistanceBadge('danger', `ระยะห่าง ${dist} ม. (อยู่นอกรัศมี ${maxRadius} ม.)`);
+          checkinBtn.disabled = true;
+        }
+      }, (err) => {
+        console.error(err);
+        updateDistanceBadge('error', `ไม่สามารถเข้าถึงตำแหน่งพิกัดได้: ${err.message}`);
+      }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+    }
+
+    function updateDistanceBadge(type, text) {
+      distanceBadge.className = `location-badge ${type}`;
+      distanceText.textContent = text;
+      
+      const icon = distanceBadge.querySelector('i');
+      if (type === 'success') {
+        icon.className = 'fa-solid fa-circle-check';
+      } else if (type === 'danger' || type === 'error') {
+        icon.className = 'fa-solid fa-triangle-exclamation';
+      } else {
+        icon.className = 'fa-solid fa-location-crosshairs';
+      }
+    }
+
+    // กดเช็คอิน
+    checkinBtn.addEventListener('click', async () => {
+      if (!userCoords) return;
+
+      checkinBtn.disabled = true;
+      statusMessage.className = 'status-message info show';
+      statusMessage.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> กำลังบันทึกข้อมูลการเช็คอินลงฐานข้อมูล...';
+
+      try {
+        const response = await fetch('/checkin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            lat: userCoords.lat,
+            lng: userCoords.lng
+          })
+        });
+        const data = await response.json();
+
+        if (data.success) {
+          statusMessage.className = 'status-message success show';
+          statusMessage.innerHTML = `<i class="fa-solid fa-circle-check"></i> <strong>ลงชื่อสำเร็จ!</strong> ${data.message} (ระยะห่าง ${data.distance_meters} เมตร)`;
+          loadHistory();
+        } else {
+          statusMessage.className = 'status-message error show';
+          statusMessage.innerHTML = `<i class="fa-solid fa-circle-xmark"></i> <strong>เช็คอินไม่สำเร็จ</strong><br>${data.message}`;
+          checkinBtn.disabled = false;
+        }
+      } catch (err) {
+        statusMessage.className = 'status-message error show';
+        statusMessage.innerHTML = '<i class="fa-solid fa-circle-xmark"></i> ไม่สามารถติดต่อกับเซิร์ฟเวอร์ได้';
+        checkinBtn.disabled = false;
+      }
+    });
+
+    // โหลดประวัติของนักศึกษาผู้ล็อกอิน
+    async function loadHistory() {
+      historyBody.innerHTML = '<tr><td colspan="4" class="text-center"><i class="fa-solid fa-spinner fa-spin"></i> กำลังดึงประวัติ...</td></tr>';
+      try {
+        const response = await fetch('/history');
+        const data = await response.json();
+
+        if (data.success && data.history.length > 0) {
+          historyBody.innerHTML = data.history.map(item => {
+            const statusBadge = item.status === 'success' 
+              ? '<span class="badge success"><i class="fa-solid fa-check"></i> สำเร็จ</span>' 
+              : '<span class="badge danger"><i class="fa-solid fa-xmark"></i> ล้มเหลว</span>';
+            return `
+              <tr>
+                <td>${item.timestamp}</td>
+                <td>${item.distance_meters} ม.</td>
+                <td><small class="text-muted">${item.lat.toFixed(5)}, ${item.lng.toFixed(5)}</small></td>
+                <td>${statusBadge}</td>
+              </tr>
+            `;
+          }).join('');
+        } else {
+          historyBody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">ไม่พบประวัติการเช็คอินที่ผ่านมาของคุณ</td></tr>';
+        }
+      } catch (err) {
+        historyBody.innerHTML = '<tr><td colspan="4" class="text-center text-danger">เกิดข้อผิดพลาดในการโหลดประวัติการเช็คอิน</td></tr>';
+      }
+    }
+
+    refreshHistoryBtn.addEventListener('click', loadHistory);
+
+    // เริ่มทำงานเมื่อเปิดหน้า
+    trackLocation();
+    loadHistory();
+  </script>
+  {% endif %}
+</body>
+</html>

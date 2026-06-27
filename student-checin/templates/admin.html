@@ -1,0 +1,636 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ระบบเช็คอินเข้าเรียน - แผงควบคุมผู้ดูแลระบบ (Admin Dashboard)</title>
+  <!-- Google Fonts: Inter & Outfit -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- FontAwesome for icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+  <style>
+    /* Admin-specific layout styles */
+    .admin-nav {
+      display: inline-flex;
+      border-radius: var(--radius-md);
+      background: rgba(15, 23, 42, 0.4);
+      padding: 6px;
+      border: 1px solid var(--border-color);
+      margin-bottom: 25px;
+      width: 100%;
+    }
+    
+    .nav-tab {
+      flex: 1;
+      padding: 12px;
+      text-align: center;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      font-family: var(--font-title);
+      font-weight: 600;
+      color: var(--text-secondary);
+      transition: var(--transition);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    
+    .nav-tab.active {
+      background: var(--primary-gradient);
+      color: white;
+      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
+    }
+    
+    .tab-content {
+      display: none;
+    }
+    
+    .tab-content.active {
+      display: block;
+    }
+    
+    /* Stats Grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+      margin-bottom: 25px;
+    }
+    
+    @media (max-width: 768px) {
+      .stats-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+    
+    .stat-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 20px 25px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+    }
+    
+    .stat-info {
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .stat-label {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      color: var(--text-secondary);
+      font-weight: 500;
+      letter-spacing: 0.05em;
+      margin-bottom: 5px;
+    }
+    
+    .stat-value {
+      font-family: var(--font-title);
+      font-size: 2rem;
+      font-weight: 700;
+      color: white;
+    }
+    
+    .stat-icon {
+      width: 48px;
+      height: 48px;
+      background: rgba(99, 102, 241, 0.15);
+      color: var(--primary-color);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.3rem;
+      box-shadow: 0 0 15px rgba(99, 102, 241, 0.1);
+    }
+    
+    .stat-card:nth-child(2) .stat-icon {
+      background: rgba(59, 130, 246, 0.15);
+      color: var(--info);
+    }
+    
+    .stat-card:nth-child(3) .stat-icon {
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--success);
+    }
+    
+    /* Admin Controls and Header */
+    .controls-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+    
+    .btn-danger-outline {
+      background: transparent;
+      border: 1px solid rgba(239, 68, 68, 0.4);
+      color: var(--danger);
+    }
+    
+    .btn-danger-outline:hover {
+      background: var(--danger-bg);
+      color: white;
+      border-color: var(--danger);
+    }
+    
+    .btn-table-action {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-color);
+      color: var(--text-secondary);
+      padding: 6px 12px;
+      font-size: 0.8rem;
+      border-radius: var(--radius-sm);
+    }
+    
+    .btn-table-action:hover.delete {
+      background: var(--danger-bg);
+      color: #f87171;
+      border-color: rgba(239, 68, 68, 0.3);
+    }
+    
+    .btn-table-action:hover.edit {
+      background: rgba(99, 102, 241, 0.15);
+      color: #a5b4fc;
+      border-color: rgba(99, 102, 241, 0.3);
+    }
+    
+    /* Toggle Switch style */
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 46px;
+      height: 24px;
+    }
+    
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #374151;
+      transition: .3s;
+      border-radius: 34px;
+    }
+    
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 18px;
+      width: 18px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: .3s;
+      border-radius: 50%;
+    }
+    
+    input:checked + .slider {
+      background-color: var(--success);
+    }
+    
+    input:checked + .slider:before {
+      transform: translateX(22px);
+    }
+    
+    /* Inline Add Student Card */
+    .inline-form {
+      display: grid;
+      grid-template-columns: 1.2fr 1.8fr auto;
+      gap: 15px;
+      align-items: flex-end;
+      background: rgba(15, 23, 42, 0.3);
+      padding: 20px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-color);
+      margin-bottom: 25px;
+    }
+    
+    @media (max-width: 600px) {
+      .inline-form {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="glass-bg"></div>
+  
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="logo">
+        <i class="fa-solid fa-gauge-high pulse"></i>
+        <span>ADMIN DASHBOARD</span>
+      </div>
+      <div class="subtitle">ระบบควบคุมและบริหารจัดการข้อมูลการเช็คอิน</div>
+    </header>
+
+    <!-- Stats Panel -->
+    <section class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-info">
+          <span class="stat-label">เช็คอินรวม</span>
+          <span id="statCheckins" class="stat-value">-</span>
+        </div>
+        <div class="stat-icon"><i class="fa-solid fa-signature"></i></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-info">
+          <span class="stat-label">นักศึกษาทั้งหมด</span>
+          <span id="statStudents" class="stat-value">-</span>
+        </div>
+        <div class="stat-icon"><i class="fa-solid fa-users"></i></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-info">
+          <span class="stat-label">บัญชีเปิดใช้งาน</span>
+          <span id="statActive" class="stat-value">-</span>
+        </div>
+        <div class="stat-icon"><i class="fa-solid fa-user-check"></i></div>
+      </div>
+    </section>
+
+    <!-- Navigation Tabs -->
+    <nav class="admin-nav">
+      <div id="tabHistoryBtn" class="nav-tab active" data-tab="tabHistory">
+        <i class="fa-solid fa-clock-rotate-left"></i> ประวัติการเช็คอินทั้งหมด
+      </div>
+      <div id="tabStudentsBtn" class="nav-tab" data-tab="tabStudents">
+        <i class="fa-solid fa-user-gear"></i> จัดการรายชื่อนักศึกษา
+      </div>
+    </nav>
+
+    <!-- TAB 1: Check-in History -->
+    <div id="tabHistory" class="tab-content active">
+      <section class="card">
+        <div class="controls-header">
+          <h2 class="card-title"><i class="fa-solid fa-list-check"></i> รายการเช็คอินทั้งหมด</h2>
+          <div style="display: flex; gap: 10px;">
+            <button id="refreshCheckinsBtn" class="btn btn-icon" title="ดึงข้อมูลล่าสุด"><i class="fa-solid fa-rotate"></i></button>
+            <button id="clearCheckinsBtn" class="btn btn-danger-outline btn-sm"><i class="fa-solid fa-trash-can"></i> ล้างประวัติทั้งหมด</button>
+          </div>
+        </div>
+
+        <div class="table-container">
+          <table class="history-table">
+            <thead>
+              <tr>
+                <th>วัน-เวลา</th>
+                <th>รหัสนักศึกษา</th>
+                <th>ชื่อ-นามสกุล</th>
+                <th>ระยะห่าง</th>
+                <th>ตำแหน่งพิกัด (Lat, Lng)</th>
+                <th>สถานะ</th>
+                <th>จัดการ</th>
+              </tr>
+            </thead>
+            <tbody id="adminHistoryBody">
+              <tr>
+                <td colspan="7" class="text-center text-muted">กำลังโหลดข้อมูล...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <!-- TAB 2: Student Management -->
+    <div id="tabStudents" class="tab-content">
+      <!-- Add/Edit Student Form -->
+      <section class="card" style="margin-bottom: 25px;">
+        <h2 class="card-title"><i class="fa-solid fa-user-plus"></i> เพิ่ม / อัปเดตรายชื่อนักศึกษา</h2>
+        <div class="inline-form">
+          <div class="input-group" style="margin-bottom: 0;">
+            <label for="newStudentId">รหัสนักศึกษา</label>
+            <div class="input-wrapper">
+              <i class="fa-solid fa-id-card input-icon"></i>
+              <input type="text" id="newStudentId" placeholder="เช่น u004" required>
+            </div>
+          </div>
+          <div class="input-group" style="margin-bottom: 0;">
+            <label for="newStudentName">ชื่อ-นามสกุล</label>
+            <div class="input-wrapper">
+              <i class="fa-solid fa-user input-icon"></i>
+              <input type="text" id="newStudentName" placeholder="เช่น นายวันฉัตร รักดี" required>
+            </div>
+          </div>
+          <button id="saveStudentBtn" class="btn btn-primary" style="width: auto; height: 48px;">
+            <i class="fa-solid fa-floppy-disk"></i> บันทึกข้อมูล
+          </button>
+        </div>
+        <div id="formFeedback" class="helper-text"></div>
+      </section>
+
+      <!-- Student List Table -->
+      <section class="card">
+        <div class="controls-header">
+          <h2 class="card-title"><i class="fa-solid fa-address-book"></i> ทะเบียนรายชื่อนักศึกษา</h2>
+          <button id="refreshStudentsBtn" class="btn btn-icon" title="รีเฟรชรายชื่อ"><i class="fa-solid fa-rotate"></i></button>
+        </div>
+
+        <div class="table-container">
+          <table class="history-table">
+            <thead>
+              <tr>
+                <th>รหัสนักศึกษา</th>
+                <th>ชื่อ-นามสกุล</th>
+                <th>สิทธิ์การใช้งาน (Active)</th>
+                <th>จัดการ</th>
+              </tr>
+            </thead>
+            <tbody id="adminStudentsBody">
+              <tr>
+                <td colspan="4" class="text-center text-muted">กำลังโหลดข้อมูล...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <!-- Back to Main Site -->
+    <div class="text-center" style="margin-top: 15px;">
+      <a href="/" style="color: var(--primary-color); text-decoration: none; font-weight: 500; font-size: 0.95rem;">
+        <i class="fa-solid fa-arrow-left"></i> กลับไปยังหน้าเช็คอินสำหรับนักศึกษา
+      </a>
+    </div>
+  </div>
+
+  <script>
+    // Tab switching logic
+    const tabs = document.querySelectorAll('.nav-tab');
+    const tabContents = document.querySelectorAll('.tab-content');
+    
+    tabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        const target = tab.dataset.tab;
+        
+        tabs.forEach(t => t.classList.remove('active'));
+        tabContents.forEach(c => c.classList.remove('active'));
+        
+        tab.classList.add('active');
+        document.getElementById(target).classList.add('active');
+
+        // Load correct tab contents
+        if (target === 'tabHistory') {
+          loadAllCheckins();
+        } else if (target === 'tabStudents') {
+          loadAllStudents();
+        }
+      });
+    });
+
+    // Load Overview Stats
+    async function loadStats() {
+      try {
+        const response = await fetch('/api/admin/stats');
+        const data = await response.json();
+        if (data.success) {
+          document.getElementById('statCheckins').textContent = data.total_checkins;
+          document.getElementById('statStudents').textContent = data.total_students;
+          document.getElementById('statActive').textContent = data.active_students;
+        }
+      } catch (err) {
+        console.error('Error loading stats:', err);
+      }
+    }
+
+    // Load Checkin History
+    const adminHistoryBody = document.getElementById('adminHistoryBody');
+    async function loadAllCheckins() {
+      adminHistoryBody.innerHTML = '<tr><td colspan="7" class="text-center"><i class="fa-solid fa-spinner fa-spin"></i> กำลังโหลดประวัติ...</td></tr>';
+      try {
+        const response = await fetch('/api/admin/checkins');
+        const data = await response.json();
+        
+        if (data.success && data.checkins.length > 0) {
+          adminHistoryBody.innerHTML = data.checkins.map(item => {
+            const statusBadge = item.status === 'success' 
+              ? '<span class="badge success"><i class="fa-solid fa-check"></i> สำเร็จ</span>' 
+              : '<span class="badge danger"><i class="fa-solid fa-xmark"></i> ล้มเหลว</span>';
+              
+            return `
+              <tr>
+                <td>${item.timestamp}</td>
+                <td><strong>${item.student_id}</strong></td>
+                <td>${item.name}</td>
+                <td>${item.distance_meters} ม.</td>
+                <td><small class="text-muted">${item.lat.toFixed(6)}, ${item.lng.toFixed(6)}</small></td>
+                <td>${statusBadge}</td>
+                <td>
+                  <button onclick="deleteCheckin('${item.id}')" class="btn-table-action delete" title="ลบรายการนี้">
+                    <i class="fa-solid fa-trash-can"></i> ลบ
+                  </button>
+                </td>
+              </tr>
+            `;
+          }).join('');
+        } else {
+          adminHistoryBody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">ไม่พบข้อมูลประวัติการเช็คอินในระบบ</td></tr>';
+        }
+      } catch (err) {
+        adminHistoryBody.innerHTML = '<tr><td colspan="7" class="text-center text-danger">เกิดข้อผิดพลาดในการโหลดประวัติ</td></tr>';
+      }
+    }
+
+    // Delete single checkin
+    async function deleteCheckin(id) {
+      if (!confirm('คุณแน่ใจหรือไม่ที่จะลบรายการเช็คอินนี้?')) return;
+      try {
+        const response = await fetch(`/api/admin/checkins/${id}`, { method: 'DELETE' });
+        const data = await response.json();
+        if (data.success) {
+          loadAllCheckins();
+          loadStats();
+        } else {
+          alert('ลบไม่สำเร็จ: ' + data.message);
+        }
+      } catch (err) {
+        alert('เกิดข้อผิดพลาดในการติดต่อเซิร์ฟเวอร์');
+      }
+    }
+
+    // Clear all checkins
+    document.getElementById('clearCheckinsBtn').addEventListener('click', async () => {
+      if (!confirm('⚠️ คำเตือน: คุณกำลังจะล้างข้อมูลการเช็คอินทั้งหมดในระบบ! ยืนยันที่จะลบใช่หรือไม่?')) return;
+      if (!confirm('ยืนยันเป็นครั้งสุดท้ายที่จะลบประวัติการเช็คอินทั้งหมดใช่หรือไม่? (การกระทำนี้ไม่สามารถย้อนกลับได้)')) return;
+      
+      try {
+        const response = await fetch('/api/admin/checkins', { method: 'DELETE' });
+        const data = await response.json();
+        if (data.success) {
+          alert(data.message);
+          loadAllCheckins();
+          loadStats();
+        } else {
+          alert('เกิดข้อผิดพลาด: ' + data.message);
+        }
+      } catch (err) {
+        alert('เกิดข้อผิดพลาดในการล้างข้อมูล');
+      }
+    });
+
+    // Load Students List
+    const adminStudentsBody = document.getElementById('adminStudentsBody');
+    async function loadAllStudents() {
+      adminStudentsBody.innerHTML = '<tr><td colspan="4" class="text-center"><i class="fa-solid fa-spinner fa-spin"></i> กำลังโหลดรายชื่อ...</td></tr>';
+      try {
+        const response = await fetch('/api/admin/students');
+        const data = await response.json();
+        
+        if (data.success && data.students.length > 0) {
+          adminStudentsBody.innerHTML = data.students.map(item => {
+            const isChecked = item.active ? 'checked' : '';
+            return `
+              <tr>
+                <td><strong>${item.id}</strong></td>
+                <td>${item.name}</td>
+                <td>
+                  <label class="switch">
+                    <input type="checkbox" ${isChecked} onchange="toggleStudentStatus('${item.id}', this.checked)">
+                    <span class="slider"></span>
+                  </label>
+                </td>
+                <td>
+                  <div style="display: flex; gap: 8px;">
+                    <button onclick="editStudent('${item.id}', '${item.name}')" class="btn-table-action edit" title="แก้ไขชื่อ">
+                      <i class="fa-solid fa-pen-to-square"></i> แก้ไขชื่อ
+                    </button>
+                    <button onclick="deleteStudent('${item.id}')" class="btn-table-action delete" title="ลบรายชื่อ">
+                      <i class="fa-solid fa-user-minus"></i> ลบ
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            `;
+          }).join('');
+        } else {
+          adminStudentsBody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">ไม่พบข้อมูลรายชื่อนักศึกษาในระบบ</td></tr>';
+        }
+      } catch (err) {
+        adminStudentsBody.innerHTML = '<tr><td colspan="4" class="text-center text-danger">เกิดข้อผิดพลาดในการโหลดข้อมูลนักศึกษา</td></tr>';
+      }
+    }
+
+    // Add/Update student
+    const newStudentId = document.getElementById('newStudentId');
+    const newStudentName = document.getElementById('newStudentName');
+    const saveStudentBtn = document.getElementById('saveStudentBtn');
+    const formFeedback = document.getElementById('formFeedback');
+
+    saveStudentBtn.addEventListener('click', async () => {
+      const studentId = newStudentId.value.trim();
+      const name = newStudentName.value.trim();
+      
+      if (!studentId || !name) {
+        formFeedback.className = 'helper-text error';
+        formFeedback.innerHTML = '<i class="fa-solid fa-circle-xmark"></i> กรุณากรอกรหัสและชื่อ-นามสกุล ให้ครบถ้วน';
+        return;
+      }
+      
+      saveStudentBtn.disabled = true;
+      formFeedback.className = 'helper-text loading';
+      formFeedback.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> กำลังบันทึกข้อมูล...';
+      
+      try {
+        const response = await fetch('/api/admin/students', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ student_id: studentId, name: name, active: true })
+        });
+        const data = await response.json();
+        
+        if (data.success) {
+          formFeedback.className = 'helper-text success';
+          formFeedback.innerHTML = `<i class="fa-solid fa-circle-check"></i> ${data.message}`;
+          newStudentId.value = '';
+          newStudentName.value = '';
+          loadAllStudents();
+          loadStats();
+        } else {
+          formFeedback.className = 'helper-text error';
+          formFeedback.innerHTML = `<i class="fa-solid fa-circle-xmark"></i> ${data.message}`;
+        }
+      } catch (err) {
+        formFeedback.className = 'helper-text error';
+        formFeedback.innerHTML = '<i class="fa-solid fa-circle-xmark"></i> ไม่สามารถบันทึกข้อมูลได้';
+      } finally {
+        saveStudentBtn.disabled = false;
+      }
+    });
+
+    // Toggle student active state
+    async function toggleStudentStatus(studentId, isChecked) {
+      try {
+        const response = await fetch('/api/admin/students', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ student_id: studentId, active: isChecked })
+        });
+        const data = await response.json();
+        if (data.success) {
+          loadStats();
+        } else {
+          alert('เปลี่ยนสถานะไม่สำเร็จ: ' + data.message);
+          loadAllStudents();
+        }
+      } catch (err) {
+        alert('เกิดข้อผิดพลาดในการอัปเดตสถานะ');
+        loadAllStudents();
+      }
+    }
+
+    // Set form to edit student name
+    function editStudent(id, name) {
+      newStudentId.value = id;
+      newStudentName.value = name;
+      newStudentName.focus();
+      formFeedback.className = 'helper-text info';
+      formFeedback.innerHTML = '<i class="fa-solid fa-circle-info"></i> ปรับแก้ข้อมูลชื่อด้านบนแล้วกด "บันทึกข้อมูล"';
+    }
+
+    // Delete student
+    async function deleteStudent(id) {
+      if (!confirm(`คุณแน่ใจหรือไม่ที่จะลบนักศึกษา รหัส ${id} ออกจากระบบ? (ประวัติการเช็คอินที่เก็บไว้จะไม่ถูกลบ)`)) return;
+      try {
+        const response = await fetch(`/api/admin/students/${id}`, { method: 'DELETE' });
+        const data = await response.json();
+        if (data.success) {
+          loadAllStudents();
+          loadStats();
+        } else {
+          alert('ลบรายชื่อนักศึกษาไม่สำเร็จ: ' + data.message);
+        }
+      } catch (err) {
+        alert('เกิดข้อผิดพลาดในการติดต่อเซิร์ฟเวอร์');
+      }
+    }
+
+    // Init page
+    loadStats();
+    loadAllCheckins();
+
+    // Event Listeners for manual triggers
+    document.getElementById('refreshCheckinsBtn').addEventListener('click', () => { loadAllCheckins(); loadStats(); });
+    document.getElementById('refreshStudentsBtn').addEventListener('click', () => { loadAllStudents(); loadStats(); });
+  </script>
+</body>
+</html>
